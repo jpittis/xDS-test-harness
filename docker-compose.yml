@@ -1,0 +1,16 @@
+version: "3"
+services:
+  envoy_proxy:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/envoy-proxy
+    volumes:
+    - ./config/envoy-proxy-config.yml:/etc/envoy-proxy-config.yaml
+    ports:
+    - "9901:9901"
+  xds_server:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/xds-server
+    ports:
+    - "5678:5678"

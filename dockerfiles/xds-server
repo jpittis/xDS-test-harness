@@ -1,0 +1,10 @@
+FROM golang:1.12 as bldr
+
+WORKDIR /go/src/github.com/jpittis/xDS-test-harness
+COPY . .
+
+RUN env GOOS=linux CGO_ENABLED=0 go install -v ./cmd/xds-server
+
+FROM alpine
+COPY --from=bldr /go/bin/xds-server /xds-server
+ENTRYPOINT ["/xds-server"]
