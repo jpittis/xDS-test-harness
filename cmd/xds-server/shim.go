@@ -52,9 +52,8 @@ func (s *Shim) StopServer() error {
 		s.grpcServer.Stop()
 	}
 
-	var err error
 	if s.ln != nil {
-		err = s.ln.Close()
+		s.ln.Close()
 	}
 
 	s.grpcServer = nil
@@ -62,7 +61,7 @@ func (s *Shim) StopServer() error {
 	s.snapshotCache = nil
 	s.ln = nil
 
-	return err
+	return nil
 }
 
 func (s *Shim) SetSnapshot(node string, snapshot cache.Snapshot) error {

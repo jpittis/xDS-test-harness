@@ -12,8 +12,17 @@ const (
 
 func main() {
 	shim := NewShim(xDSListenAddr)
+
+	go func() {
+		for err := range shim.Errors {
+			if err != nil {
+				log.Fatal("gRPC server exited with err: ", err)
+			}
+		}
+	}()
+
 	err := http.ListenAndServe(shimListenAddr, NewShimHandler(shim))
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("ListenAndServe exited with err: ", err)
 	}
 }
