@@ -2,6 +2,7 @@ package test
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -35,17 +36,21 @@ func TestWorking(t *testing.T) {
 
 		t.Log("Testing snapshot")
 		var success bool
-		for i := 0; i < 10; i++ {
+		for i := 0; i < 15; i++ {
 			data, err := client.ConfigDump()
 			if err == nil && bytes.Contains(data, []byte("some_service")) {
 				success = true
 				break
 
 			}
-			t.Logf("Polling %d", i)
+			t.Logf("Polling config dump %d", i)
 			time.Sleep(time.Second)
 		}
 		require.True(t, success)
+
+		t.Log("Getting original uptime")
+		originalUptime, err := client.UptimeAllEpochs()
+		require.NoError(t, err)
 
 		t.Log("Stopping server")
 		err = client.StopServer()
@@ -54,6 +59,20 @@ func TestWorking(t *testing.T) {
 		t.Log("Quit quit quit")
 		err = client.QuitQuitQuit()
 		require.NoError(t, err)
+
+		success = false
+		for i := 0; i < 15; i++ {
+			uptime, err := client.UptimeAllEpochs()
+			// fmt.Println(uptime, originalUptime, err)
+			if err == nil && uptime < originalUptime {
+				success = true
+				break
+
+			}
+			t.Logf("Polling uptime %d: %s < %s", i, uptime, originalUptime)
+			time.Sleep(time.Second)
+		}
+		require.True(t, success)
 	}
 }
 
@@ -91,6 +110,28 @@ func (c *ShimClient) QuitQuitQuit() error {
 
 func (c *ShimClient) ConfigDump() ([]byte, error) {
 	return c.get(c.envoyAddr, "/config_dump")
+}
+
+func (c *ShimClient) UptimeAllEpochs() (time.Duration, error) {
+	data, err := c.ServerInfo()
+	if err != nil {
+		return time.Duration(0), err
+	}
+
+	parsed := struct {
+		UptimeAllEpochs string `json:"uptime_all_epochs"`
+	}{}
+
+	err = json.Unmarshal(data, &parsed)
+	if err != nil {
+		return time.Duration(0), nil
+	}
+
+	return time.ParseDuration(parsed.UptimeAllEpochs)
+}
+
+func (c *ShimClient) ServerInfo() ([]byte, error) {
+	return c.get(c.envoyAddr, "/server_info")
 }
 
 func (c *ShimClient) post(addr string, path string, body io.Reader) error {
