@@ -2,21 +2,26 @@ package test
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/gogo/protobuf/types"
 	"github.com/jpittis/xDS-test-harness/pkg/admin"
+	"github.com/jpittis/xDS-test-harness/pkg/shim"
 	"github.com/stretchr/testify/require"
 )
 
-const shimAddr = "http://127.0.0.1:4678"
+const shimTestHost = "127.0.0.1:4678"
 const envoyTestHost = "127.0.0.1:9901"
 
 func TestWorking(t *testing.T) {
-	client := NewShimClient(shimAddr, envoyTestHost)
+	shimClient := &shim.Client{
+		Host: shimTestHost,
+		HTTPClient: &http.Client{
+			Timeout: time.Second,
+		},
+	}
 
 	adminClient := &admin.Client{
 		Host: envoyTestHost,
@@ -29,15 +34,15 @@ func TestWorking(t *testing.T) {
 		t.Logf("Attempt %d", i)
 
 		t.Log("Double checking server is stopped")
-		err := client.StopServer()
+		_, err := shimClient.StopServer()
 		require.NoError(t, err)
 
 		t.Log("Starting server")
-		err = client.StartServer()
+		_, err = shimClient.StartServer()
 		require.NoError(t, err)
 
 		t.Log("Setting snapshot")
-		err = client.SetSnapshot()
+		_, err = shimClient.SetSnapshot()
 		require.NoError(t, err)
 
 		t.Log("Testing snapshot")
@@ -63,7 +68,7 @@ func TestWorking(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Log("Stopping server")
-		err = client.StopServer()
+		_, err = shimClient.StopServer()
 		require.NoError(t, err)
 
 		t.Log("Quit quit quit")
@@ -89,44 +94,4 @@ func TestWorking(t *testing.T) {
 		}
 		require.True(t, success)
 	}
-}
-
-func NewShimClient(shimAddr, envoyAddr string) *ShimClient {
-	return &ShimClient{
-		shimAddr:  shimAddr,
-		envoyAddr: envoyAddr,
-		client: &http.Client{
-			Timeout: time.Second,
-		},
-	}
-}
-
-type ShimClient struct {
-	shimAddr  string
-	envoyAddr string
-	client    *http.Client
-}
-
-func (c *ShimClient) StartServer() error {
-	return c.post(c.shimAddr, "/start_server", nil)
-}
-
-func (c *ShimClient) StopServer() error {
-	return c.post(c.shimAddr, "/stop_server", nil)
-}
-
-func (c *ShimClient) SetSnapshot() error {
-	return c.post(c.shimAddr, "/set_snapshot", nil)
-}
-
-func (c *ShimClient) post(addr string, path string, body io.Reader) error {
-	resp, err := c.client.Post(addr+path, "application/json", body)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("bad status: %d", resp.StatusCode)
-	}
-
-	return nil
 }
