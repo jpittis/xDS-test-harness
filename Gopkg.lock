@@ -10,9 +10,10 @@
   version = "v1.1.1"
 
 [[projects]]
-  digest = "1:bdf13c945d7507535e4d6ba9e6d89c66d16e845667bee9de9ce7028c398a02cb"
+  digest = "1:8c7968a533881eb95da3477b7c6c9642045e80d5f493c53b73063683dfa60ba7"
   name = "github.com/envoyproxy/go-control-plane"
   packages = [
+    "envoy/admin/v2alpha",
     "envoy/api/v2",
     "envoy/api/v2/auth",
     "envoy/api/v2/cluster",
@@ -21,11 +22,18 @@
     "envoy/api/v2/listener",
     "envoy/api/v2/route",
     "envoy/config/accesslog/v2",
+    "envoy/config/bootstrap/v2",
     "envoy/config/filter/accesslog/v2",
     "envoy/config/filter/network/http_connection_manager/v2",
     "envoy/config/filter/network/tcp_proxy/v2",
+    "envoy/config/metrics/v2",
+    "envoy/config/overload/v2alpha",
+    "envoy/config/ratelimit/v2",
+    "envoy/config/trace/v2",
     "envoy/service/discovery/v2",
+    "envoy/service/tap/v2alpha",
     "envoy/type",
+    "envoy/type/matcher",
     "pkg/cache",
     "pkg/log",
     "pkg/server",
@@ -201,11 +209,13 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/envoyproxy/go-control-plane/envoy/admin/v2alpha",
     "github.com/envoyproxy/go-control-plane/envoy/api/v2/core",
     "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v2",
     "github.com/envoyproxy/go-control-plane/pkg/cache",
     "github.com/envoyproxy/go-control-plane/pkg/server",
     "github.com/envoyproxy/go-control-plane/pkg/test/resource",
+    "github.com/gogo/protobuf/jsonpb",
     "github.com/stretchr/testify/require",
     "google.golang.org/grpc",
   ]
