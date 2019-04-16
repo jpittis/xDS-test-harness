@@ -1,23 +1,29 @@
 package test
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"testing"
 	"time"
 
+	"github.com/gogo/protobuf/types"
+	"github.com/jpittis/xDS-test-harness/pkg/admin"
 	"github.com/stretchr/testify/require"
 )
 
 const shimAddr = "http://127.0.0.1:4678"
-const envoyAddr = "http://127.0.0.1:9901"
+const envoyTestHost = "127.0.0.1:9901"
 
 func TestWorking(t *testing.T) {
-	client := NewShimClient(shimAddr, envoyAddr)
+	client := NewShimClient(shimAddr, envoyTestHost)
+
+	adminClient := &admin.Client{
+		Host: envoyTestHost,
+		HTTPClient: &http.Client{
+			Timeout: time.Second,
+		},
+	}
 
 	for i := 0; i < 2; i++ {
 		t.Logf("Attempt %d", i)
@@ -37,19 +43,23 @@ func TestWorking(t *testing.T) {
 		t.Log("Testing snapshot")
 		var success bool
 		for i := 0; i < 15; i++ {
-			data, err := client.ConfigDump()
-			if err == nil && bytes.Contains(data, []byte("some_service")) {
+			configDump, err := adminClient.ConfigDump()
+			require.NoError(t, err)
+			fmt.Println(configDump.ClustersConfigDump.DynamicActiveClusters)
+			if len(configDump.ClustersConfigDump.DynamicActiveClusters) > 0 &&
+				configDump.ClustersConfigDump.DynamicActiveClusters[0].Cluster.Name == "some_service" {
 				success = true
 				break
 
 			}
+
 			t.Logf("Polling config dump %d", i)
 			time.Sleep(time.Second)
 		}
 		require.True(t, success)
 
 		t.Log("Getting original uptime")
-		originalUptime, err := client.UptimeAllEpochs()
+		originalServerInfo, err := adminClient.ServerInfo()
 		require.NoError(t, err)
 
 		t.Log("Stopping server")
@@ -57,19 +67,24 @@ func TestWorking(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Log("Quit quit quit")
-		err = client.QuitQuitQuit()
+		err = adminClient.QuitQuitQuit()
 		require.NoError(t, err)
 
 		success = false
 		for i := 0; i < 15; i++ {
-			uptime, err := client.UptimeAllEpochs()
-			// fmt.Println(uptime, originalUptime, err)
-			if err == nil && uptime < originalUptime {
+			currentServerInfo, err := adminClient.ServerInfo()
+			require.NoError(t, err)
+			currentUptime, err := types.DurationFromProto(currentServerInfo.UptimeAllEpochs)
+			require.NoError(t, err)
+			originalUptime, err := types.DurationFromProto(originalServerInfo.UptimeAllEpochs)
+			require.NoError(t, err)
+
+			if err == nil && currentUptime < originalUptime {
 				success = true
 				break
 
 			}
-			t.Logf("Polling uptime %d: %s < %s", i, uptime, originalUptime)
+			t.Logf("Polling uptime %d: %s < %s", i, currentUptime, originalUptime)
 			time.Sleep(time.Second)
 		}
 		require.True(t, success)
@@ -104,36 +119,6 @@ func (c *ShimClient) SetSnapshot() error {
 	return c.post(c.shimAddr, "/set_snapshot", nil)
 }
 
-func (c *ShimClient) QuitQuitQuit() error {
-	return c.post(c.envoyAddr, "/quitquitquit", nil)
-}
-
-func (c *ShimClient) ConfigDump() ([]byte, error) {
-	return c.get(c.envoyAddr, "/config_dump")
-}
-
-func (c *ShimClient) UptimeAllEpochs() (time.Duration, error) {
-	data, err := c.ServerInfo()
-	if err != nil {
-		return time.Duration(0), err
-	}
-
-	parsed := struct {
-		UptimeAllEpochs string `json:"uptime_all_epochs"`
-	}{}
-
-	err = json.Unmarshal(data, &parsed)
-	if err != nil {
-		return time.Duration(0), nil
-	}
-
-	return time.ParseDuration(parsed.UptimeAllEpochs)
-}
-
-func (c *ShimClient) ServerInfo() ([]byte, error) {
-	return c.get(c.envoyAddr, "/server_info")
-}
-
 func (c *ShimClient) post(addr string, path string, body io.Reader) error {
 	resp, err := c.client.Post(addr+path, "application/json", body)
 	if err != nil {
@@ -144,17 +129,4 @@ func (c *ShimClient) post(addr string, path string, body io.Reader) error {
 	}
 
 	return nil
-}
-
-func (c *ShimClient) get(addr string, path string) ([]byte, error) {
-	resp, err := c.client.Get(addr + path)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("bad status: %d", resp.StatusCode)
-	}
-
-	defer resp.Body.Close()
-	return ioutil.ReadAll(resp.Body)
 }

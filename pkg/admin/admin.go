@@ -9,14 +9,15 @@ import (
 
 	v2alpha "github.com/envoyproxy/go-control-plane/envoy/admin/v2alpha"
 	"github.com/gogo/protobuf/jsonpb"
+	"github.com/gogo/protobuf/types"
 )
 
 type Client struct {
-	Host   string
-	Client *http.Client
+	Host       string
+	HTTPClient *http.Client
 }
 
-func (c *Client) ConfigDump() (*v2alpha.ConfigDump, error) {
+func (c *Client) ConfigDump() (*ConfigDump, error) {
 	data, err := c.getJSON("/config_dump")
 	if err != nil {
 		return nil, err
@@ -24,7 +25,51 @@ func (c *Client) ConfigDump() (*v2alpha.ConfigDump, error) {
 
 	var configDump v2alpha.ConfigDump
 	err = jsonpb.Unmarshal(bytes.NewBuffer(data), &configDump)
-	return &configDump, err
+
+	parsed, err := parseAnyConfigs(&configDump)
+	return parsed, err
+}
+
+// We need to define a custom wrapper ConfigDump that holds the parsed Configs protobuf
+// any values into their respective protobuf messages.
+type ConfigDump struct {
+	BootstrapConfigDump *v2alpha.BootstrapConfigDump
+	ClustersConfigDump  *v2alpha.ClustersConfigDump
+	ListenersConfigDump *v2alpha.ListenersConfigDump
+	RoutesConfigDump    *v2alpha.RoutesConfigDump
+}
+
+func parseAnyConfigs(configDump *v2alpha.ConfigDump) (*ConfigDump, error) {
+	result := &ConfigDump{}
+
+	result.BootstrapConfigDump = &v2alpha.BootstrapConfigDump{}
+	err := types.UnmarshalAny(&configDump.Configs[0], result.BootstrapConfigDump)
+	if err != nil {
+		return result, err
+	}
+
+	result.ClustersConfigDump = &v2alpha.ClustersConfigDump{}
+	err = types.UnmarshalAny(&configDump.Configs[1], result.ClustersConfigDump)
+	if err != nil {
+		return result, err
+	}
+
+	result.ListenersConfigDump = &v2alpha.ListenersConfigDump{}
+	err = types.UnmarshalAny(&configDump.Configs[2], result.ListenersConfigDump)
+	if err != nil {
+		return result, err
+	}
+
+	// Looks like the routes config dump isn't always present.
+	if len(configDump.Configs) >= 4 {
+		result.RoutesConfigDump = &v2alpha.RoutesConfigDump{}
+		err = types.UnmarshalAny(&configDump.Configs[3], result.RoutesConfigDump)
+		if err != nil {
+			return result, err
+		}
+	}
+
+	return result, err
 }
 
 func (c *Client) Clusters() (*v2alpha.Clusters, error) {
@@ -59,7 +104,7 @@ func (c *Client) getJSON(path string) ([]byte, error) {
 }
 
 func (c *Client) get(path string) ([]byte, error) {
-	resp, err := c.Client.Get(c.url(path))
+	resp, err := c.HTTPClient.Get(c.url(path))
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +122,7 @@ func (c *Client) get(path string) ([]byte, error) {
 }
 
 func (c *Client) post(path string, body io.Reader) (int, error) {
-	resp, err := c.Client.Post(c.url(path), "application/json", body)
+	resp, err := c.HTTPClient.Post(c.url(path), "application/json", body)
 	return resp.StatusCode, err
 }
 

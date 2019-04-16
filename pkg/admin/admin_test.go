@@ -12,7 +12,7 @@ const envoyTestHost = "127.0.0.1:9901"
 
 var testClient = &Client{
 	Host: envoyTestHost,
-	Client: &http.Client{
+	HTTPClient: &http.Client{
 		Timeout: 1 * time.Second,
 	},
 }
