@@ -2,6 +2,7 @@ package harness
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 const (
 	DefaultTimeout = time.Second
 	PollInterval   = time.Second
+	RestartTimeout = 10 * time.Second
 )
 
 var ErrTimeout = errors.New("timeout")
@@ -93,4 +95,31 @@ func (h *Handle) uptime() (time.Duration, error) {
 		return time.Duration(0), err
 	}
 	return types.DurationFromProto(serverInfo.UptimeAllEpochs)
+}
+
+func (h *Handle) WithFreshEnvoy(f func(h *Handle) error) error {
+	log.Println("starting xDS server")
+	_, err := h.Shim.StartServer()
+	if err != nil {
+		return err
+	}
+
+	err = f(h)
+	if err != nil {
+		return err
+	}
+
+	log.Println("stopping xDS server")
+	_, err = h.Shim.StopServer()
+	if err != nil {
+		return err
+	}
+
+	log.Println("restarting envoy")
+	err = h.WaitRestart(RestartTimeout)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

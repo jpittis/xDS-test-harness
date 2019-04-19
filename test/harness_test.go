@@ -18,27 +18,17 @@ const (
 func TestWorking(t *testing.T) {
 	h := harness.NewHandle(shimTestHost, envoyTestHost)
 
-	t.Log("Starting server")
-	_, err := h.Shim.StartServer()
-	require.NoError(t, err)
+	err := h.WithFreshEnvoy(func(h *harness.Handle) error {
+		_, err := h.Shim.SetSnapshot()
+		return err
 
-	t.Log("Setting snapshot")
-	_, err = h.Shim.SetSnapshot()
-	require.NoError(t, err)
+		err = h.WaitConfigDump(func(configDump *admin.ConfigDump) bool {
+			dynamicActiveClusters := configDump.ClustersConfigDump.DynamicActiveClusters
+			return len(dynamicActiveClusters) > 0 &&
+				dynamicActiveClusters[0].Cluster.Name == "some_service"
+		}, defaultTimeout)
+		return err
+	})
 
-	t.Log("Testing snapshot")
-	err = h.WaitConfigDump(func(configDump *admin.ConfigDump) bool {
-		dynamicActiveClusters := configDump.ClustersConfigDump.DynamicActiveClusters
-		return len(dynamicActiveClusters) > 0 &&
-			dynamicActiveClusters[0].Cluster.Name == "some_service"
-	}, defaultTimeout)
-	require.NoError(t, err)
-
-	t.Log("Stopping server")
-	_, err = h.Shim.StopServer()
-	require.NoError(t, err)
-
-	t.Log("Restarting envoy")
-	err = h.WaitRestart(defaultTimeout)
 	require.NoError(t, err)
 }
