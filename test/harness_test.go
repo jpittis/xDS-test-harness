@@ -19,15 +19,17 @@ func TestWorking(t *testing.T) {
 	h := harness.NewHandle(shimTestHost, envoyTestHost)
 
 	err := h.WithFreshEnvoy(func(h *harness.Handle) error {
+		// This sends a hardcoded snapshot with a single "some_service" cluster.
 		_, err := h.Shim.SetSnapshot()
-		return err
+		if err != nil {
+			return err
+		}
 
-		err = h.WaitConfigDump(func(configDump *admin.ConfigDump) bool {
+		return h.WaitConfigDump(func(configDump *admin.ConfigDump) bool {
 			dynamicActiveClusters := configDump.ClustersConfigDump.DynamicActiveClusters
 			return len(dynamicActiveClusters) > 0 &&
 				dynamicActiveClusters[0].Cluster.Name == "some_service"
 		}, defaultTimeout)
-		return err
 	})
 
 	require.NoError(t, err)
