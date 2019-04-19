@@ -25,6 +25,9 @@ func (c *Client) SetSnapshot() (int, error) {
 
 func (c *Client) post(path string, body io.Reader) (int, error) {
 	resp, err := c.HTTPClient.Post(c.url(path), "application/json", body)
+	if err != nil {
+		return 0, err
+	}
 	return resp.StatusCode, err
 }
 
