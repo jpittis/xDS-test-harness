@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"os/exec"
 	"time"
 
 	"github.com/gogo/protobuf/types"
@@ -69,6 +70,8 @@ func (h *Handle) WaitRestart(timeout time.Duration) error {
 		return err
 	}
 
+	// TODO: Replace QuitQuitQuit with
+	// err = h.HotRestart()
 	err = h.Admin.QuitQuitQuit()
 	if err != nil {
 		return err
@@ -122,4 +125,10 @@ func (h *Handle) WithFreshEnvoy(f func(h *Handle) error) error {
 	}
 
 	return nil
+}
+
+func (h *Handle) HotRestart() error {
+	// TODO: Add a daemon to the envoy pod that listens for an HTTP call and then triggers
+	// a sighup.
+	return exec.Command("config/sighup.sh").Run()
 }
