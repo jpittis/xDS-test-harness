@@ -7,8 +7,11 @@ services:
       dockerfile: ./dockerfiles/envoy-proxy
     volumes:
     - ./config/envoy-proxy-config.yml:/etc/envoy-proxy-config.yaml
+    - ./config/start-envoy.sh:/etc/start-envoy.sh
+    - ./config/hot-restarter.py:/etc/hot-restarter.py
     ports:
     - "9901:9901"
+
   xds_server:
     build:
       context: .

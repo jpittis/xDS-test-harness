@@ -1,3 +1,5 @@
 FROM envoyproxy/envoy-alpine:latest
 
-ENTRYPOINT envoy -c /etc/envoy-proxy-config.yaml --service-cluster cluster1 --service-node node1
+RUN apk add bash python
+
+ENTRYPOINT /etc/hot-restarter.py /etc/start-envoy.sh
