@@ -1,12 +1,17 @@
 package harness
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os/exec"
 	"time"
 
+	v2alpha "github.com/envoyproxy/go-control-plane/envoy/admin/v2alpha"
+
+	"github.com/gogo/protobuf/jsonpb"
 	"github.com/gogo/protobuf/types"
 	"github.com/jpittis/xDS-test-harness/pkg/admin"
 	"github.com/jpittis/xDS-test-harness/pkg/shim"
@@ -15,7 +20,7 @@ import (
 const (
 	DefaultTimeout = time.Second
 	PollInterval   = time.Second
-	RestartTimeout = 10 * time.Second
+	RestartTimeout = 20 * time.Second
 )
 
 var ErrTimeout = errors.New("timeout")
@@ -65,24 +70,25 @@ func (h *Handle) WaitConfigDump(f func(*admin.ConfigDump) bool, timeout time.Dur
 func (h *Handle) WaitRestart(timeout time.Duration) error {
 	start := time.Now()
 
-	originalUptime, err := h.uptime()
+	originalEpoch, err := h.restart_epoch()
 	if err != nil {
 		return err
 	}
 
-	// TODO: Replace QuitQuitQuit with
-	// err = h.HotRestart()
-	err = h.Admin.QuitQuitQuit()
+	err = h.HotRestart()
 	if err != nil {
 		return err
 	}
 
 	for {
-		// Ignore the error because Envoy is restarting and may not be listening for admin
-		// requests.
-		currentUptime, _ := h.uptime()
+		currentEpoch, err := h.restart_epoch()
+		if err != nil {
+			return err
+		}
 
-		if currentUptime < originalUptime {
+		fmt.Println(currentEpoch, originalEpoch)
+
+		if currentEpoch > originalEpoch {
 			return nil
 		} else if start.Add(timeout).Before(time.Now()) {
 			return ErrTimeout
@@ -98,6 +104,24 @@ func (h *Handle) uptime() (time.Duration, error) {
 		return time.Duration(0), err
 	}
 	return types.DurationFromProto(serverInfo.UptimeAllEpochs)
+}
+
+func (h *Handle) restart_epoch() (uint32, error) {
+	data, err := exec.Command("curl", "-s", "localhost:9901/server_info").Output()
+	if err != nil {
+		return 0, err
+	}
+	var serverInfo v2alpha.ServerInfo
+	err = jsonpb.Unmarshal(bytes.NewBuffer(data), &serverInfo)
+	if err != nil {
+		return 0, err
+	}
+
+	// serverInfo, err := h.Admin.ServerInfo()
+	// if err != nil {
+	// 	return 0, err
+	// }
+	return serverInfo.CommandLineOptions.RestartEpoch, nil
 }
 
 func (h *Handle) WithFreshEnvoy(f func(h *Handle) error) error {
@@ -128,7 +152,12 @@ func (h *Handle) WithFreshEnvoy(f func(h *Handle) error) error {
 }
 
 func (h *Handle) HotRestart() error {
-	// TODO: Add a daemon to the envoy pod that listens for an HTTP call and then triggers
-	// a sighup.
-	return exec.Command("config/sighup.sh").Run()
+	resp, err := http.Post("http://127.0.0.1:3678", "", nil)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unknown status: %d", resp.StatusCode)
+	}
+	return nil
 }

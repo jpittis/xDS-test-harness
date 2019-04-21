@@ -6,6 +6,8 @@ import signal
 import sys
 import time
 
+from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+
 # The number of seconds to wait for children to gracefully exit after
 # propagating SIGTERM before force killing children.
 # NOTE: If using a shutdown mechanism such as runit's `force-stop` which sends
@@ -186,6 +188,18 @@ def fork_and_exec():
     pid_list.append(child_pid)
 
 
+class Handler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        sighup_handler(None, None)
+        self.send_response(200)
+        self.send_header("Content-type", "text/html")
+        self.end_headers()
+
+
+def serve():
+    HTTPServer(('0.0.0.0', 3678), Handler).serve_forever()
+
+
 def main():
   """ Script main. This script is designed so that a process watcher like runit or monit can watch
       this process and take corrective action if it ever goes away. """
@@ -201,6 +215,7 @@ def main():
   # Start the first child process and then go into an endless loop since everything else happens via
   # signals.
   fork_and_exec()
+  serve()
   while True:
     time.sleep(60)
 

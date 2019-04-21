@@ -11,6 +11,7 @@ services:
     - ./config/hot-restarter.py:/etc/hot-restarter.py
     ports:
     - "9901:9901"
+    - "3678:3678"
 
   xds_server:
     build:
