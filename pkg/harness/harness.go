@@ -20,7 +20,7 @@ import (
 const (
 	DefaultTimeout = time.Second
 	PollInterval   = time.Second
-	RestartTimeout = 20 * time.Second
+	RestartTimeout = 10 * time.Second
 )
 
 var ErrTimeout = errors.New("timeout")
@@ -117,10 +117,12 @@ func (h *Handle) restart_epoch() (uint32, error) {
 		return 0, err
 	}
 
+	// TODO: For some reason this client is talking to the old server.
 	// serverInfo, err := h.Admin.ServerInfo()
 	// if err != nil {
 	// 	return 0, err
 	// }
+
 	return serverInfo.CommandLineOptions.RestartEpoch, nil
 }
 

@@ -42,13 +42,4 @@ func TestWorking(t *testing.T) {
 $ docker-compose up -d
 $ cd test
 $ go test
-PASS
-ok      github.com/jpittis/xDS-test-harness/test        7.073s
 ```
-
-## Limitations
-
-- I spin up an Envoy per test (and likely multiple Envoys for more complex tests in the
-  future). This is really slow. We're talking ~7 seconds per simple test on my development
-  machine. Maybe parallelization is the answer or an way to force envoy to reset
-  configuration without restarting the process. Maybe I should investigate hot restarts.

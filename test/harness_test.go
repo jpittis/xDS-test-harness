@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jpittis/xDS-test-harness/pkg/admin"
 	"github.com/jpittis/xDS-test-harness/pkg/harness"
 	"github.com/stretchr/testify/require"
 )
@@ -27,12 +28,11 @@ func TestWorking(t *testing.T) {
 		}
 
 		log.Println("Waiting for config dump")
-		// return h.WaitConfigDump(func(configDump *admin.ConfigDump) bool {
-		// 	dynamicActiveClusters := configDump.ClustersConfigDump.DynamicActiveClusters
-		// 	return len(dynamicActiveClusters) > 0 &&
-		// 		dynamicActiveClusters[0].Cluster.Name == "some_service"
-		// }, defaultTimeout)
-		return nil
+		return h.WaitConfigDump(func(configDump *admin.ConfigDump) bool {
+			dynamicActiveClusters := configDump.ClustersConfigDump.DynamicActiveClusters
+			return len(dynamicActiveClusters) > 0 &&
+				dynamicActiveClusters[0].Cluster.Name == "some_service"
+		}, defaultTimeout)
 	})
 
 	require.NoError(t, err)
